@@ -1,0 +1,11 @@
+I want a web application built which I will fiddle with and maintain.
+I want it to be a kind of svg laboratory where I can fiddle with bits of svg code and see the results rendered.
+I want it to be a standalone web application with no server io.
+I want the svg editor on the left side of the window and the viewer on the left.
+I want it to work similar to jsfiddle, but be only concerned with a chunk of svg code.
+I want it to use CodeMirror for syntax highlighting in the editor.
+I want preset templates.
+I do not want a run button.  I want auto-update.
+I want a File Menu, with Save As and an Open as its two options.
+Both should use the Google Chrome file api.
+I want autosave and drag-drop file import.
