@@ -18,10 +18,6 @@
       font-family: sans-serif;
     }
 
-    .CodeMirror {
-      height: 100%;
-    }
-
     #main {
       display: flex;
       flex: 1;
@@ -51,10 +47,13 @@
       overflow: hidden;
     }
 
-    #editorPanel {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+    #editorPanel.dragover {
+      background-color: #eef;
+    }
+
+    .CodeMirror {
+      flex: 1;
+      height: 100%;
     }
 
     #previewPanel {
@@ -81,7 +80,6 @@
     }
 
     #zoomWrapper svg {
-      transform-origin: top left;
       display: inline-block;
       pointer-events: none;
     }
@@ -182,6 +180,8 @@
   let panY = 0;
   let isDragging = false;
   let startX, startY;
+  let transformOriginX = 0;
+  let transformOriginY = 0;
 
   const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
     mode: 'xml',
@@ -252,18 +252,17 @@
     zoomLevel = 1;
     panX = 0;
     panY = 0;
+    transformOriginX = 0;
+    transformOriginY = 0;
     applyTransform();
   }
 
   function applyTransform() {
     const svg = zoomWrapper.firstElementChild;
     if (svg) {
+      svg.style.transformOrigin = `${transformOriginX}px ${transformOriginY}px`;
       svg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
     }
-  }
-
-  function updateFilenameDisplay(name) {
-    filenameDisplay.textContent = name || 'Unsaved file';
   }
 
   async function saveAsFile() {
@@ -305,8 +304,15 @@
     }, 1000);
   }
 
+  function updateFilenameDisplay(name) {
+    filenameDisplay.textContent = name || 'Unsaved file';
+  }
+
   svgPreview.addEventListener('wheel', e => {
     e.preventDefault();
+    const rect = svgPreview.getBoundingClientRect();
+    transformOriginX = e.clientX - rect.left;
+    transformOriginY = e.clientY - rect.top;
     e.deltaY < 0 ? zoomIn() : zoomOut();
   });
 

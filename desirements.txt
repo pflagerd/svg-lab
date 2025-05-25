@@ -19,3 +19,6 @@ I'd like mousewheel zoom for the preview
 I'd like a resizable split pane between editor/preview
 I want Mousewheel zoom, with or without Ctrl.
 I want panning/dragging of the zoomed SVG.
+I want the zoom centered at the mouse position, instead of being relative to upper left corner.
+I'd like a "zoom to fit" button.
+Also, when I use the zoom buttons after using the mousewheel, the image "jumps".  Kind of like the zoom buttons don't respect the last mouse position used to zoom.
