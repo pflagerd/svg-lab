@@ -4,27 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>SVG Lab</title>
-
-  <!-- CodeMirror CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material.min.css" />
-
   <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      font-family: sans-serif;
-    }
-
-    #main {
-      display: flex;
-      flex: 1;
-      width: 100%;
-      overflow: hidden;
-    }
-
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: sans-serif; }
+    #main { display: flex; flex: 1; width: 100%; overflow: hidden; }
     #controls {
       padding: 10px;
       background: #f4f4f4;
@@ -33,10 +17,9 @@
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
     }
-
-    .left   { justify-self: start; }
+    .left { justify-self: start; }
     .center { justify-self: center; font-weight: bold; color: #333; font-size: 14px; }
-    .right  { justify-self: end; }
+    .right { justify-self: end; }
 
     #editorPanel {
       width: 50%;
@@ -46,26 +29,15 @@
       position: relative;
       overflow: hidden;
     }
-
-    #editorPanel.dragover {
-      background-color: #eef;
-    }
-
-    .CodeMirror {
-      flex: 1;
-      height: 100%;
-    }
-
+    .CodeMirror { flex: 1; height: 100%; }
     #previewPanel {
-      flex: 1;
-      height: 100%;
+      flex: 1; height: 100%;
       display: flex;
       justify-content: center;
       align-items: flex-start;
       background-color: #fff;
       overflow: hidden;
     }
-
     #svgPreview {
       width: 100%;
       height: 100%;
@@ -74,35 +46,27 @@
       box-sizing: border-box;
       cursor: grab;
     }
-
-    #svgPreview:active {
-      cursor: grabbing;
-    }
-
+    #svgPreview:active { cursor: grabbing; }
     #zoomWrapper svg {
       display: inline-block;
       pointer-events: none;
     }
-
     #resizer {
       width: 5px;
       background: #ddd;
       cursor: col-resize;
       height: 100%;
     }
-
     .menu {
       position: relative;
       display: inline-block;
     }
-
     .menu button {
       background: none;
       border: none;
       font-size: 16px;
       cursor: pointer;
     }
-
     .menu-content {
       display: none;
       position: absolute;
@@ -112,7 +76,6 @@
       z-index: 1;
       border: 1px solid #ccc;
     }
-
     .menu-content button {
       width: 100%;
       padding: 8px;
@@ -121,10 +84,7 @@
       text-align: left;
       cursor: pointer;
     }
-
-    .menu:hover .menu-content {
-      display: block;
-    }
+    .menu:hover .menu-content { display: block; }
   </style>
 </head>
 <body>
@@ -153,9 +113,7 @@
 </div>
 
 <div id="main">
-  <div id="editorPanel">
-    <textarea id="editor"></textarea>
-  </div>
+  <div id="editorPanel"><textarea id="editor"></textarea></div>
   <div id="resizer"></div>
   <div id="previewPanel">
     <div id="svgPreview">
@@ -163,6 +121,7 @@
         <button onclick="zoomIn()">+</button>
         <button onclick="zoomOut()">−</button>
         <button onclick="resetZoom()">⭯</button>
+        <button onclick="zoomToFit()">⤢</button>
       </div>
       <div id="zoomWrapper"></div>
     </div>
@@ -171,23 +130,14 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
-
 <script>
-  let fileHandle = null;
-  let autosaveTimer = null;
-  let zoomLevel = 1;
-  let panX = 0;
-  let panY = 0;
-  let isDragging = false;
-  let startX, startY;
-  let transformOriginX = 0;
-  let transformOriginY = 0;
+  let fileHandle = null, autosaveTimer = null;
+  let zoomLevel = 1, panX = 0, panY = 0;
+  let transformOriginX = 0, transformOriginY = 0;
+  let isDragging = false, startX, startY;
 
   const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
-    mode: 'xml',
-    theme: 'material',
-    lineNumbers: true,
-    lineWrapping: true
+    mode: 'xml', theme: 'material', lineNumbers: true, lineWrapping: true
   });
 
   const zoomWrapper = document.getElementById('zoomWrapper');
@@ -228,32 +178,11 @@
 
   templateSelect.addEventListener('change', e => {
     const val = e.target.value;
-    if (templates[val]) {
-      editor.setValue(templates[val]);
-    }
+    if (templates[val]) editor.setValue(templates[val]);
   });
 
   function updatePreview() {
     zoomWrapper.innerHTML = editor.getValue();
-    applyTransform();
-  }
-
-  function zoomIn() {
-    zoomLevel *= 1.1;
-    applyTransform();
-  }
-
-  function zoomOut() {
-    zoomLevel /= 1.1;
-    applyTransform();
-  }
-
-  function resetZoom() {
-    zoomLevel = 1;
-    panX = 0;
-    panY = 0;
-    transformOriginX = 0;
-    transformOriginY = 0;
     applyTransform();
   }
 
@@ -263,6 +192,81 @@
       svg.style.transformOrigin = `${transformOriginX}px ${transformOriginY}px`;
       svg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
     }
+  }
+
+  function ensureTransformOrigin() {
+    if (transformOriginX == null || transformOriginY == null) {
+      const rect = svgPreview.getBoundingClientRect();
+      transformOriginX = rect.width / 2;
+      transformOriginY = rect.height / 2;
+    }
+  }
+
+  function zoomIn() { ensureTransformOrigin(); zoomLevel *= 1.1; applyTransform(); }
+  function zoomOut() { ensureTransformOrigin(); zoomLevel /= 1.1; applyTransform(); }
+
+  function resetZoom() {
+    zoomLevel = 1; panX = 0; panY = 0;
+    transformOriginX = 0; transformOriginY = 0;
+    applyTransform();
+  }
+
+  function zoomToFit() {
+    const svg = zoomWrapper.firstElementChild;
+    if (!svg) return;
+    const viewBox = svg.getBoundingClientRect();
+    const container = svgPreview.getBoundingClientRect();
+    const padding = 20;
+    const scaleX = (container.width - padding * 2) / viewBox.width;
+    const scaleY = (container.height - padding * 2) / viewBox.height;
+    zoomLevel = Math.min(scaleX, scaleY);
+    panX = 0; panY = 0;
+    transformOriginX = 0; transformOriginY = 0;
+    applyTransform();
+  }
+
+  svgPreview.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = svgPreview.getBoundingClientRect();
+    transformOriginX = e.clientX - rect.left;
+    transformOriginY = e.clientY - rect.top;
+    e.deltaY < 0 ? zoomIn() : zoomOut();
+  });
+
+  svgPreview.addEventListener('mousedown', e => {
+    isDragging = true; startX = e.clientX; startY = e.clientY;
+  });
+
+  svgPreview.addEventListener('mousemove', e => {
+    if (isDragging) {
+      panX += e.clientX - startX;
+      panY += e.clientY - startY;
+      startX = e.clientX;
+      startY = e.clientY;
+      applyTransform();
+    }
+  });
+
+  svgPreview.addEventListener('mouseup', () => isDragging = false);
+  svgPreview.addEventListener('mouseleave', () => isDragging = false);
+
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = editorPanel.offsetWidth;
+    function resize(e) {
+      editorPanel.style.width = `${startWidth + (e.clientX - startX)}px`;
+    }
+    function stop() {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stop);
+    }
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('mouseup', stop);
+  });
+
+  function updateFilenameDisplay(name) {
+    filenameDisplay.textContent = name || 'Unsaved file';
   }
 
   async function saveAsFile() {
@@ -279,8 +283,7 @@
   async function openFile() {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }],
-        multiple: false
+        types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
       });
       const file = await handle.getFile();
       const contents = await file.text();
@@ -303,55 +306,6 @@
       writeFile(fileHandle, editor.getValue()).catch(console.error);
     }, 1000);
   }
-
-  function updateFilenameDisplay(name) {
-    filenameDisplay.textContent = name || 'Unsaved file';
-  }
-
-  svgPreview.addEventListener('wheel', e => {
-    e.preventDefault();
-    const rect = svgPreview.getBoundingClientRect();
-    transformOriginX = e.clientX - rect.left;
-    transformOriginY = e.clientY - rect.top;
-    e.deltaY < 0 ? zoomIn() : zoomOut();
-  });
-
-  svgPreview.addEventListener('mousedown', e => {
-    isDragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-  });
-
-  svgPreview.addEventListener('mousemove', e => {
-    if (isDragging) {
-      panX += e.clientX - startX;
-      panY += e.clientY - startY;
-      startX = e.clientX;
-      startY = e.clientY;
-      applyTransform();
-    }
-  });
-
-  svgPreview.addEventListener('mouseup', () => isDragging = false);
-  svgPreview.addEventListener('mouseleave', () => isDragging = false);
-
-  resizer.addEventListener('mousedown', e => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = editorPanel.offsetWidth;
-
-    function resize(e) {
-      editorPanel.style.width = `${startWidth + (e.clientX - startX)}px`;
-    }
-
-    function stop() {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stop);
-    }
-
-    window.addEventListener('mousemove', resize);
-    window.addEventListener('mouseup', stop);
-  });
 
   window.addEventListener('keydown', async e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -380,6 +334,5 @@
     }
   });
 </script>
-
 </body>
 </html>
