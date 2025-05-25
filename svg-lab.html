@@ -119,7 +119,6 @@
 </head>
 <body>
 
-<!-- Top Bar Controls -->
 <div id="controls">
   <div class="left">
     <div class="menu">
@@ -130,9 +129,7 @@
       </div>
     </div>
   </div>
-
   <div id="filenameDisplay" class="center">No file loaded</div>
-
   <div class="right">
     <label for="templateSelect">Template:</label>
     <select id="templateSelect">
@@ -145,14 +142,11 @@
   </div>
 </div>
 
-<!-- Main Area -->
 <div id="main">
   <div id="editorPanel">
     <textarea id="editor"></textarea>
   </div>
-
   <div id="resizer"></div>
-
   <div id="previewPanel">
     <div id="svgPreview">
       <div style="padding: 10px; text-align: right;">
@@ -208,7 +202,6 @@
   const editorPanel = document.getElementById('editorPanel');
   const filenameDisplay = document.getElementById('filenameDisplay');
   const resizer = document.getElementById('resizer');
-  const previewPanel = document.getElementById('previewPanel');
 
   editor.on('change', () => {
     updatePreview();
@@ -338,16 +331,14 @@
     }
   });
 
-  // Mousewheel zoom with Ctrl/Cmd
+  // 🔁 Mousewheel zoom without Ctrl
   document.getElementById('svgPreview').addEventListener('wheel', e => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      if (e.deltaY < 0) zoomIn();
-      else zoomOut();
-    }
+    e.preventDefault();
+    if (e.deltaY < 0) zoomIn();
+    else zoomOut();
   });
 
-  // Drag-to-resize
+  // ↔️ Drag-to-resize logic
   resizer.addEventListener('mousedown', (e) => {
     e.preventDefault();
     document.body.style.cursor = 'col-resize';
@@ -369,6 +360,5 @@
     document.addEventListener('mouseup', onMouseUp);
   });
 </script>
-
 </body>
 </html>

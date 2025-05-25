@@ -17,3 +17,4 @@ I want the preview to be zoomable/resizable.
 The implementation has somehow got the File menu, the filename and the template on the preview window as well as the editor window.  I only want it on the the editor window.
 I'd like mousewheel zoom for the preview
 I'd like a resizable split pane between editor/preview
+I want Mousewheel zoom, with or without Ctrl.
