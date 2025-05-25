@@ -283,3 +283,326 @@
 
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SVG Lab</title>
+
+  <!-- CodeMirror CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material.min.css" />
+
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      font-family: sans-serif;
+    }
+
+    #editorPanel {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ccc;
+      position: relative;
+    }
+
+    #editorPanel.dragover {
+      background-color: #eef;
+    }
+
+    #controls {
+      padding: 10px;
+      background: #f4f4f4;
+      border-bottom: 1px solid #ccc;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+    }
+
+    .left   { justify-self: start; }
+    .center { justify-self: center; font-weight: bold; color: #333; font-size: 14px; }
+    .right  { justify-self: end; }
+
+    #previewPanel {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background-color: #fff;
+    }
+
+    #svgPreview {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #zoomWrapper svg {
+      transform-origin: top left;
+      display: inline-block;
+    }
+
+    .menu {
+      position: relative;
+      display: inline-block;
+    }
+
+    .menu button {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .menu-content {
+      display: none;
+      position: absolute;
+      background-color: white;
+      min-width: 120px;
+      box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+      z-index: 1;
+      border: 1px solid #ccc;
+    }
+
+    .menu-content button {
+      width: 100%;
+      padding: 8px;
+      border: none;
+      background: none;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .menu:hover .menu-content {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<div id="editorPanel">
+  <div id="controls">
+    <div class="left">
+      <div class="menu">
+        <button>File ▾</button>
+        <div class="menu-content">
+          <button onclick="openFile()">Open...</button>
+          <button onclick="saveAsFile()">Save As...</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="filenameDisplay" class="center">No file loaded</div>
+
+    <div class="right">
+      <label for="templateSelect">Template:</label>
+      <select id="templateSelect">
+        <option value="">-- Select Template --</option>
+        <option value="circle">Circle</option>
+        <option value="rectangle">Rectangle</option>
+        <option value="star">Star</option>
+        <option value="complex">Complex Example</option>
+      </select>
+    </div>
+  </div>
+
+  <textarea id="editor"></textarea>
+</div>
+
+<div id="previewPanel">
+  <div id="svgPreview">
+    <div style="padding: 10px; text-align: right;">
+      <button onclick="zoomIn()">+</button>
+      <button onclick="zoomOut()">−</button>
+      <button onclick="resetZoom()">⭯</button>
+    </div>
+    <div id="zoomWrapper"></div>
+  </div>
+</div>
+
+<!-- CodeMirror JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+
+<script>
+  let fileHandle = null;
+  let autosaveTimer = null;
+  let zoomLevel = 1;
+
+  const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+    mode: 'xml',
+    theme: 'material',
+    lineNumbers: true,
+    lineWrapping: true
+  });
+
+  const templates = {
+    circle: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="100" cy="100" r="80" fill="skyblue" stroke="black" stroke-width="2"/>
+</svg>`,
+    rectangle: `<svg width="300" height="150" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="100" x="50" y="25" fill="tomato" stroke="black" stroke-width="3"/>
+</svg>`,
+    star: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="100,10 120,180 10,60 190,60 80,180" fill="gold" stroke="black" stroke-width="2"/>
+</svg>`,
+    complex: `<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:rgb(255,255,0);stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="200" cy="100" rx="180" ry="80" fill="url(#grad1)" />
+  <text x="200" y="105" font-size="30" text-anchor="middle" fill="black">SVG Lab</text>
+</svg>`
+  };
+
+  const zoomWrapper = document.getElementById('zoomWrapper');
+  const previewContainer = document.getElementById('svgPreview');
+  const templateSelect = document.getElementById('templateSelect');
+  const editorPanel = document.getElementById('editorPanel');
+  const filenameDisplay = document.getElementById('filenameDisplay');
+
+  editor.on('change', () => {
+    updatePreview();
+    scheduleAutosave();
+  });
+
+  templateSelect.addEventListener('change', (e) => {
+    const val = e.target.value;
+    if (templates[val]) {
+      editor.setValue(templates[val]);
+    }
+  });
+
+  function updatePreview() {
+    zoomWrapper.innerHTML = editor.getValue();
+    const svg = zoomWrapper.firstElementChild;
+    if (svg) {
+      svg.style.transform = `scale(${zoomLevel})`;
+    }
+  }
+
+  function zoomIn() {
+    zoomLevel *= 1.1;
+    applyZoom();
+  }
+
+  function zoomOut() {
+    zoomLevel /= 1.1;
+    applyZoom();
+  }
+
+  function resetZoom() {
+    zoomLevel = 1;
+    applyZoom();
+  }
+
+  function applyZoom() {
+    const svg = zoomWrapper.firstElementChild;
+    if (svg) {
+      svg.style.transform = `scale(${zoomLevel})`;
+    }
+  }
+
+  function updateFilenameDisplay(name) {
+    filenameDisplay.textContent = name || 'Unsaved file';
+  }
+
+  editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
+
+  async function saveAsFile() {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'drawing.svg',
+        types: [{
+          description: 'SVG Files',
+          accept: { 'image/svg+xml': ['.svg'] }
+        }]
+      });
+      await writeFile(fileHandle, editor.getValue());
+      updateFilenameDisplay(fileHandle.name || 'Saved File');
+    } catch (err) {
+      console.error('Save cancelled:', err);
+    }
+  }
+
+  async function openFile() {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'SVG Files',
+          accept: { 'image/svg+xml': ['.svg'] }
+        }],
+        multiple: false
+      });
+      const file = await handle.getFile();
+      const contents = await file.text();
+      editor.setValue(contents);
+      fileHandle = handle;
+      updateFilenameDisplay(file.name);
+    } catch (err) {
+      console.error('Open cancelled:', err);
+    }
+  }
+
+  async function writeFile(handle, contents) {
+    const writable = await handle.createWritable();
+    await writable.write(contents);
+    await writable.close();
+  }
+
+  function scheduleAutosave() {
+    if (!fileHandle) return;
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      writeFile(fileHandle, editor.getValue()).catch(console.error);
+    }, 1000);
+  }
+
+  editorPanel.addEventListener('dragover', e => {
+    e.preventDefault();
+    editorPanel.classList.add('dragover');
+  });
+
+  editorPanel.addEventListener('dragleave', () => {
+    editorPanel.classList.remove('dragover');
+  });
+
+  editorPanel.addEventListener('drop', async e => {
+    e.preventDefault();
+    editorPanel.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'image/svg+xml') {
+      const text = await file.text();
+      editor.setValue(text);
+      fileHandle = null;
+      updateFilenameDisplay(file.name + ' (not saved)');
+    } else {
+      alert('Only SVG files supported for drag-drop');
+    }
+  });
+
+  window.addEventListener('keydown', async (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (fileHandle) {
+        await writeFile(fileHandle, editor.getValue());
+      } else {
+        await saveAsFile();
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
