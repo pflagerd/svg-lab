@@ -23,6 +23,11 @@
       display: flex;
       flex-direction: column;
       border-right: 1px solid #ccc;
+      position: relative;
+    }
+
+    #editorPanel.dragover {
+      background-color: #eef;
     }
 
     #controls {
@@ -122,6 +127,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
 
 <script>
+  let fileHandle = null;
+  let autosaveTimer = null;
+
   const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
     mode: 'xml',
     theme: 'material',
@@ -153,8 +161,13 @@
 
   const previewContainer = document.getElementById('svgPreview');
   const templateSelect = document.getElementById('templateSelect');
+  const editorPanel = document.getElementById('editorPanel');
 
-  editor.on('change', updatePreview);
+  editor.on('change', () => {
+    updatePreview();
+    scheduleAutosave();
+  });
+
   templateSelect.addEventListener('change', (e) => {
     const val = e.target.value;
     if (templates[val]) {
@@ -168,41 +181,74 @@
 
   editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
 
-  // File: Save As
   async function saveAsFile() {
     try {
-      const handle = await window.showSaveFilePicker({
+      fileHandle = await window.showSaveFilePicker({
         suggestedName: 'drawing.svg',
         types: [{
           description: 'SVG Files',
           accept: { 'image/svg+xml': ['.svg'] }
         }]
       });
-      const writable = await handle.createWritable();
-      await writable.write(editor.getValue());
-      await writable.close();
+      await writeFile(fileHandle, editor.getValue());
     } catch (err) {
-      console.error('Save cancelled or failed:', err);
+      console.error('Save cancelled:', err);
     }
   }
 
-  // File: Open
   async function openFile() {
     try {
-      const [fileHandle] = await window.showOpenFilePicker({
+      const [handle] = await window.showOpenFilePicker({
         types: [{
           description: 'SVG Files',
           accept: { 'image/svg+xml': ['.svg'] }
         }],
         multiple: false
       });
-      const file = await fileHandle.getFile();
+      const file = await handle.getFile();
       const contents = await file.text();
       editor.setValue(contents);
+      fileHandle = handle;
     } catch (err) {
-      console.error('Open cancelled or failed:', err);
+      console.error('Open cancelled:', err);
     }
   }
+
+  async function writeFile(handle, contents) {
+    const writable = await handle.createWritable();
+    await writable.write(contents);
+    await writable.close();
+  }
+
+  function scheduleAutosave() {
+    if (!fileHandle) return;
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      writeFile(fileHandle, editor.getValue()).catch(console.error);
+    }, 1000);
+  }
+
+  // Drag & Drop
+  editorPanel.addEventListener('dragover', e => {
+    e.preventDefault();
+    editorPanel.classList.add('dragover');
+  });
+
+  editorPanel.addEventListener('dragleave', () => {
+    editorPanel.classList.remove('dragover');
+  });
+
+  editorPanel.addEventListener('drop', async e => {
+    e.preventDefault();
+    editorPanel.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'image/svg+xml') {
+      const text = await file.text();
+      editor.setValue(text);
+    } else {
+      alert('Only SVG files supported for drag-drop');
+    }
+  });
 </script>
 
 </body>
