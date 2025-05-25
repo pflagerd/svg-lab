@@ -34,10 +34,14 @@
       padding: 10px;
       background: #f4f4f4;
       border-bottom: 1px solid #ccc;
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
     }
+
+    .left   { justify-self: start; }
+    .center { justify-self: center; font-weight: bold; color: #333; font-size: 14px; }
+    .right  { justify-self: end; }
 
     #previewPanel {
       width: 50%;
@@ -96,15 +100,19 @@
 
 <div id="editorPanel">
   <div id="controls">
-    <div class="menu">
-      <button>File ▾</button>
-      <div class="menu-content">
-        <button onclick="openFile()">Open...</button>
-        <button onclick="saveAsFile()">Save As...</button>
+    <div class="left">
+      <div class="menu">
+        <button>File ▾</button>
+        <div class="menu-content">
+          <button onclick="openFile()">Open...</button>
+          <button onclick="saveAsFile()">Save As...</button>
+        </div>
       </div>
     </div>
 
-    <div>
+    <div id="filenameDisplay" class="center">No file loaded</div>
+
+    <div class="right">
       <label for="templateSelect">Template:</label>
       <select id="templateSelect">
         <option value="">-- Select Template --</option>
@@ -115,6 +123,7 @@
       </select>
     </div>
   </div>
+
   <textarea id="editor"></textarea>
 </div>
 
@@ -162,6 +171,7 @@
   const previewContainer = document.getElementById('svgPreview');
   const templateSelect = document.getElementById('templateSelect');
   const editorPanel = document.getElementById('editorPanel');
+  const filenameDisplay = document.getElementById('filenameDisplay');
 
   editor.on('change', () => {
     updatePreview();
@@ -179,6 +189,10 @@
     previewContainer.innerHTML = editor.getValue();
   }
 
+  function updateFilenameDisplay(name) {
+    filenameDisplay.textContent = name || 'Unsaved file';
+  }
+
   editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
 
   async function saveAsFile() {
@@ -191,6 +205,7 @@
         }]
       });
       await writeFile(fileHandle, editor.getValue());
+      updateFilenameDisplay(fileHandle.name || 'Saved File');
     } catch (err) {
       console.error('Save cancelled:', err);
     }
@@ -209,6 +224,7 @@
       const contents = await file.text();
       editor.setValue(contents);
       fileHandle = handle;
+      updateFilenameDisplay(file.name);
     } catch (err) {
       console.error('Open cancelled:', err);
     }
@@ -228,7 +244,7 @@
     }, 1000);
   }
 
-  // Drag & Drop
+  // Drag & Drop support
   editorPanel.addEventListener('dragover', e => {
     e.preventDefault();
     editorPanel.classList.add('dragover');
@@ -245,8 +261,22 @@
     if (file && file.type === 'image/svg+xml') {
       const text = await file.text();
       editor.setValue(text);
+      fileHandle = null;
+      updateFilenameDisplay(file.name + ' (not saved)');
     } else {
       alert('Only SVG files supported for drag-drop');
+    }
+  });
+
+  // Ctrl+S / Cmd+S keyboard shortcut
+  window.addEventListener('keydown', async (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (fileHandle) {
+        await writeFile(fileHandle, editor.getValue());
+      } else {
+        await saveAsFile();
+      }
     }
   });
 </script>

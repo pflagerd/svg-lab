@@ -9,3 +9,8 @@ I do not want a run button.  I want auto-update.
 I want a File Menu, with Save As and an Open as its two options.
 Both should use the Google Chrome file api.
 I want autosave and drag-drop file import.
+I want the filename to which the most save was made centered between the File menu and the Template.
+I want Ctrl-S to be intercepted as a shortcut for 1) save if a file is already opened, 2) Save as if the file has not been saved yet.
+I want the File menu left-justified, the Template right-justified and the filename centered between them.
+Please generate the complete code after having presented the individual changes from now on.
+I want the preview to be zoomable/resizable.
