@@ -67,11 +67,17 @@
       overflow: auto;
       padding: 10px;
       box-sizing: border-box;
+      cursor: grab;
+    }
+
+    #svgPreview:active {
+      cursor: grabbing;
     }
 
     #zoomWrapper svg {
       transform-origin: top left;
       display: inline-block;
+      pointer-events: none;
     }
 
     #resizer {
@@ -159,7 +165,6 @@
   </div>
 </div>
 
-<!-- CodeMirror JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
 
@@ -167,6 +172,10 @@
   let fileHandle = null;
   let autosaveTimer = null;
   let zoomLevel = 1;
+  let panX = 0;
+  let panY = 0;
+  let isDragging = false;
+  let startX, startY;
 
   const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
     mode: 'xml',
@@ -174,6 +183,13 @@
     lineNumbers: true,
     lineWrapping: true
   });
+
+  const zoomWrapper = document.getElementById('zoomWrapper');
+  const svgPreview = document.getElementById('svgPreview');
+  const templateSelect = document.getElementById('templateSelect');
+  const editorPanel = document.getElementById('editorPanel');
+  const filenameDisplay = document.getElementById('filenameDisplay');
+  const resizer = document.getElementById('resizer');
 
   const templates = {
     circle: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
@@ -197,18 +213,14 @@
 </svg>`
   };
 
-  const zoomWrapper = document.getElementById('zoomWrapper');
-  const templateSelect = document.getElementById('templateSelect');
-  const editorPanel = document.getElementById('editorPanel');
-  const filenameDisplay = document.getElementById('filenameDisplay');
-  const resizer = document.getElementById('resizer');
+  editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
 
   editor.on('change', () => {
     updatePreview();
     scheduleAutosave();
   });
 
-  templateSelect.addEventListener('change', (e) => {
+  templateSelect.addEventListener('change', e => {
     const val = e.target.value;
     if (templates[val]) {
       editor.setValue(templates[val]);
@@ -217,28 +229,30 @@
 
   function updatePreview() {
     zoomWrapper.innerHTML = editor.getValue();
-    applyZoom();
+    applyTransform();
   }
 
   function zoomIn() {
     zoomLevel *= 1.1;
-    applyZoom();
+    applyTransform();
   }
 
   function zoomOut() {
     zoomLevel /= 1.1;
-    applyZoom();
+    applyTransform();
   }
 
   function resetZoom() {
     zoomLevel = 1;
-    applyZoom();
+    panX = 0;
+    panY = 0;
+    applyTransform();
   }
 
-  function applyZoom() {
+  function applyTransform() {
     const svg = zoomWrapper.firstElementChild;
     if (svg) {
-      svg.style.transform = `scale(${zoomLevel})`;
+      svg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
     }
   }
 
@@ -246,31 +260,21 @@
     filenameDisplay.textContent = name || 'Unsaved file';
   }
 
-  editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
-
   async function saveAsFile() {
     try {
       fileHandle = await window.showSaveFilePicker({
         suggestedName: 'drawing.svg',
-        types: [{
-          description: 'SVG Files',
-          accept: { 'image/svg+xml': ['.svg'] }
-        }]
+        types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
       });
       await writeFile(fileHandle, editor.getValue());
       updateFilenameDisplay(fileHandle.name || 'Saved File');
-    } catch (err) {
-      console.error('Save cancelled:', err);
-    }
+    } catch (err) { console.error('Save cancelled:', err); }
   }
 
   async function openFile() {
     try {
       const [handle] = await window.showOpenFilePicker({
-        types: [{
-          description: 'SVG Files',
-          accept: { 'image/svg+xml': ['.svg'] }
-        }],
+        types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }],
         multiple: false
       });
       const file = await handle.getFile();
@@ -278,9 +282,7 @@
       editor.setValue(contents);
       fileHandle = handle;
       updateFilenameDisplay(file.name);
-    } catch (err) {
-      console.error('Open cancelled:', err);
-    }
+    } catch (err) { console.error('Open cancelled:', err); }
   }
 
   async function writeFile(handle, contents) {
@@ -291,26 +293,72 @@
 
   function scheduleAutosave() {
     if (!fileHandle) return;
-    if (autosaveTimer) clearTimeout(autosaveTimer);
+    clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
       writeFile(fileHandle, editor.getValue()).catch(console.error);
     }, 1000);
   }
+
+  svgPreview.addEventListener('wheel', e => {
+    e.preventDefault();
+    e.deltaY < 0 ? zoomIn() : zoomOut();
+  });
+
+  svgPreview.addEventListener('mousedown', e => {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+  });
+
+  svgPreview.addEventListener('mousemove', e => {
+    if (isDragging) {
+      panX += e.clientX - startX;
+      panY += e.clientY - startY;
+      startX = e.clientX;
+      startY = e.clientY;
+      applyTransform();
+    }
+  });
+
+  svgPreview.addEventListener('mouseup', () => isDragging = false);
+  svgPreview.addEventListener('mouseleave', () => isDragging = false);
+
+  resizer.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = editorPanel.offsetWidth;
+
+    function resize(e) {
+      editorPanel.style.width = `${startWidth + (e.clientX - startX)}px`;
+    }
+
+    function stop() {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stop);
+    }
+
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('mouseup', stop);
+  });
+
+  window.addEventListener('keydown', async e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      fileHandle ? await writeFile(fileHandle, editor.getValue()) : await saveAsFile();
+    }
+  });
 
   editorPanel.addEventListener('dragover', e => {
     e.preventDefault();
     editorPanel.classList.add('dragover');
   });
 
-  editorPanel.addEventListener('dragleave', () => {
-    editorPanel.classList.remove('dragover');
-  });
-
+  editorPanel.addEventListener('dragleave', () => editorPanel.classList.remove('dragover'));
   editorPanel.addEventListener('drop', async e => {
     e.preventDefault();
     editorPanel.classList.remove('dragover');
     const file = e.dataTransfer.files[0];
-    if (file && file.type === 'image/svg+xml') {
+    if (file?.type === 'image/svg+xml') {
       const text = await file.text();
       editor.setValue(text);
       fileHandle = null;
@@ -319,46 +367,7 @@
       alert('Only SVG files supported for drag-drop');
     }
   });
-
-  window.addEventListener('keydown', async (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      if (fileHandle) {
-        await writeFile(fileHandle, editor.getValue());
-      } else {
-        await saveAsFile();
-      }
-    }
-  });
-
-  // 🔁 Mousewheel zoom without Ctrl
-  document.getElementById('svgPreview').addEventListener('wheel', e => {
-    e.preventDefault();
-    if (e.deltaY < 0) zoomIn();
-    else zoomOut();
-  });
-
-  // ↔️ Drag-to-resize logic
-  resizer.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    document.body.style.cursor = 'col-resize';
-    const startX = e.clientX;
-    const startWidth = editorPanel.offsetWidth;
-
-    function onMouseMove(e) {
-      const newWidth = startWidth + (e.clientX - startX);
-      editorPanel.style.width = `${newWidth}px`;
-    }
-
-    function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-    }
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  });
 </script>
+
 </body>
 </html>
