@@ -21,6 +21,8 @@
     #main {
       display: flex;
       flex: 1;
+      width: 100%;
+      overflow: hidden;
     }
 
     #controls {
@@ -41,8 +43,8 @@
       height: 100%;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid #ccc;
       position: relative;
+      overflow: hidden;
     }
 
     #editorPanel.dragover {
@@ -50,12 +52,13 @@
     }
 
     #previewPanel {
-      width: 50%;
+      flex: 1;
       height: 100%;
       display: flex;
       justify-content: center;
       align-items: flex-start;
       background-color: #fff;
+      overflow: hidden;
     }
 
     #svgPreview {
@@ -69,6 +72,13 @@
     #zoomWrapper svg {
       transform-origin: top left;
       display: inline-block;
+    }
+
+    #resizer {
+      width: 5px;
+      background: #ddd;
+      cursor: col-resize;
+      height: 100%;
     }
 
     .menu {
@@ -135,11 +145,13 @@
   </div>
 </div>
 
-<!-- Main Editor/Preview Layout -->
+<!-- Main Area -->
 <div id="main">
   <div id="editorPanel">
     <textarea id="editor"></textarea>
   </div>
+
+  <div id="resizer"></div>
 
   <div id="previewPanel">
     <div id="svgPreview">
@@ -195,6 +207,8 @@
   const templateSelect = document.getElementById('templateSelect');
   const editorPanel = document.getElementById('editorPanel');
   const filenameDisplay = document.getElementById('filenameDisplay');
+  const resizer = document.getElementById('resizer');
+  const previewPanel = document.getElementById('previewPanel');
 
   editor.on('change', () => {
     updatePreview();
@@ -210,10 +224,7 @@
 
   function updatePreview() {
     zoomWrapper.innerHTML = editor.getValue();
-    const svg = zoomWrapper.firstElementChild;
-    if (svg) {
-      svg.style.transform = `scale(${zoomLevel})`;
-    }
+    applyZoom();
   }
 
   function zoomIn() {
@@ -325,6 +336,37 @@
         await saveAsFile();
       }
     }
+  });
+
+  // Mousewheel zoom with Ctrl/Cmd
+  document.getElementById('svgPreview').addEventListener('wheel', e => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      if (e.deltaY < 0) zoomIn();
+      else zoomOut();
+    }
+  });
+
+  // Drag-to-resize
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    document.body.style.cursor = 'col-resize';
+    const startX = e.clientX;
+    const startWidth = editorPanel.offsetWidth;
+
+    function onMouseMove(e) {
+      const newWidth = startWidth + (e.clientX - startX);
+      editorPanel.style.width = `${newWidth}px`;
+    }
+
+    function onMouseUp() {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   });
 </script>
 
