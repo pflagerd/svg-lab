@@ -227,9 +227,13 @@
 
   svgPreview.addEventListener('wheel', e => {
     e.preventDefault();
-    const rect = svgPreview.getBoundingClientRect();
-    transformOriginX = e.clientX - rect.left;
-    transformOriginY = e.clientY - rect.top;
+    const scrollLeft = svgPreview.scrollLeft;
+    const scrollTop = svgPreview.scrollTop;
+    const offsetX = e.clientX - svgPreview.getBoundingClientRect().left;
+    const offsetY = e.clientY - svgPreview.getBoundingClientRect().top;
+
+    transformOriginX = scrollLeft + offsetX;
+    transformOriginY = scrollTop + offsetY;
     e.deltaY < 0 ? zoomIn() : zoomOut();
   });
 
