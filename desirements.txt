@@ -14,3 +14,4 @@ I want Ctrl-S to be intercepted as a shortcut for 1) save if a file is already o
 I want the File menu left-justified, the Template right-justified and the filename centered between them.
 Please generate the complete code after having presented the individual changes from now on.
 I want the preview to be zoomable/resizable.
+The implementation has somehow got the File menu, the filename and the template on the preview window as well as the editor window.  I only want it on the the editor window.
