@@ -25,20 +25,18 @@
       border-right: 1px solid #ccc;
     }
 
-    #editor {
-      flex-grow: 1;
-    }
-
     #controls {
       padding: 10px;
       background: #f4f4f4;
       border-bottom: 1px solid #ccc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     #previewPanel {
       width: 50%;
       height: 100%;
-      padding: 0;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -52,20 +50,65 @@
       padding: 20px;
       box-sizing: border-box;
     }
+
+    .menu {
+      position: relative;
+      display: inline-block;
+    }
+
+    .menu button {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .menu-content {
+      display: none;
+      position: absolute;
+      background-color: white;
+      min-width: 120px;
+      box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+      z-index: 1;
+      border: 1px solid #ccc;
+    }
+
+    .menu-content button {
+      width: 100%;
+      padding: 8px;
+      border: none;
+      background: none;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .menu:hover .menu-content {
+      display: block;
+    }
   </style>
 </head>
 <body>
 
 <div id="editorPanel">
   <div id="controls">
-    <label for="templateSelect">SVG Template:</label>
-    <select id="templateSelect">
-      <option value="">-- Select Template --</option>
-      <option value="circle">Circle</option>
-      <option value="rectangle">Rectangle</option>
-      <option value="star">Star</option>
-      <option value="complex">Complex Example</option>
-    </select>
+    <div class="menu">
+      <button>File ▾</button>
+      <div class="menu-content">
+        <button onclick="openFile()">Open...</button>
+        <button onclick="saveAsFile()">Save As...</button>
+      </div>
+    </div>
+
+    <div>
+      <label for="templateSelect">Template:</label>
+      <select id="templateSelect">
+        <option value="">-- Select Template --</option>
+        <option value="circle">Circle</option>
+        <option value="rectangle">Rectangle</option>
+        <option value="star">Star</option>
+        <option value="complex">Complex Example</option>
+      </select>
+    </div>
   </div>
   <textarea id="editor"></textarea>
 </div>
@@ -79,7 +122,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
 
 <script>
-  // Initialize CodeMirror
   const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
     mode: 'xml',
     theme: 'material',
@@ -87,7 +129,6 @@
     lineWrapping: true
   });
 
-  // SVG Templates
   const templates = {
     circle: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
   <circle cx="100" cy="100" r="80" fill="skyblue" stroke="black" stroke-width="2"/>
@@ -113,16 +154,7 @@
   const previewContainer = document.getElementById('svgPreview');
   const templateSelect = document.getElementById('templateSelect');
 
-  // Update Preview
-  function updatePreview() {
-    const svgCode = editor.getValue();
-    previewContainer.innerHTML = svgCode;
-  }
-
-  // Hook editor changes to preview
   editor.on('change', updatePreview);
-
-  // Handle template selection
   templateSelect.addEventListener('change', (e) => {
     const val = e.target.value;
     if (templates[val]) {
@@ -130,8 +162,47 @@
     }
   });
 
-  // Init with empty SVG
+  function updatePreview() {
+    previewContainer.innerHTML = editor.getValue();
+  }
+
   editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
+
+  // File: Save As
+  async function saveAsFile() {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'drawing.svg',
+        types: [{
+          description: 'SVG Files',
+          accept: { 'image/svg+xml': ['.svg'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(editor.getValue());
+      await writable.close();
+    } catch (err) {
+      console.error('Save cancelled or failed:', err);
+    }
+  }
+
+  // File: Open
+  async function openFile() {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'SVG Files',
+          accept: { 'image/svg+xml': ['.svg'] }
+        }],
+        multiple: false
+      });
+      const file = await fileHandle.getFile();
+      const contents = await file.text();
+      editor.setValue(contents);
+    } catch (err) {
+      console.error('Open cancelled or failed:', err);
+    }
+  }
 </script>
 
 </body>
