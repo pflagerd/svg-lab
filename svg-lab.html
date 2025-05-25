@@ -18,6 +18,10 @@
       font-family: sans-serif;
     }
 
+    .CodeMirror {
+      height: 100%;
+    }
+
     #main {
       display: flex;
       flex: 1;
@@ -47,8 +51,10 @@
       overflow: hidden;
     }
 
-    #editorPanel.dragover {
-      background-color: #eef;
+    #editorPanel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     #previewPanel {

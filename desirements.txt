@@ -18,4 +18,4 @@ The implementation has somehow got the File menu, the filename and the template 
 I'd like mousewheel zoom for the preview
 I'd like a resizable split pane between editor/preview
 I want Mousewheel zoom, with or without Ctrl.
-I want panning/dragging of the zoomed SVG
+I want panning/dragging of the zoomed SVG.
