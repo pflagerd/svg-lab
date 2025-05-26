@@ -26,3 +26,4 @@ Zoom is still not quite right.  Still not computing correct scaled panned origin
 As soon as I've made any code modification, I want an asterisk to appear next to the filename at the top of the page to show the user that a save is needed.  When the code is saved, I want the asterisk to disappear.  I want the same behavior whether the code is manually saved or autosaved.
 As soon as the editor contents is saved to a file, I'd like same contents to be put into the browser's local storage, then when the user start the application again, I want the contents retrieved from local storage.
 If there is nothing in local storage, but there is in the editor, I want it put into local storage whether or not it has been saved to a file.
+Retain the name of the last filename saved.  When starting the program check if there was a last filename saved and if there was use that filename for the filename displayed at the top of the page.

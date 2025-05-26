@@ -154,11 +154,13 @@
   }
 
   const savedCode = localStorage.getItem('svgLabLastCode');
+  const savedName = localStorage.getItem('svgLabLastFilename');
   editor.setValue(savedCode || `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
+  updateFilenameDisplay(savedName);
 
   editor.on('change', () => {
     isDirty = true;
-    updateFilenameDisplay(fileHandle?.name);
+    updateFilenameDisplay(localStorage.getItem('svgLabLastFilename'));
     updatePreview();
     if (!localStorage.getItem('svgLabLastCode')) {
       localStorage.setItem('svgLabLastCode', editor.getValue());
@@ -279,6 +281,7 @@
       });
       await writeFile(fileHandle, editor.getValue());
       localStorage.setItem('svgLabLastCode', editor.getValue());
+      localStorage.setItem('svgLabLastFilename', fileHandle.name);
       isDirty = false;
       updateFilenameDisplay(fileHandle.name || 'Saved File');
     } catch (err) { console.error('Save cancelled:', err); }
@@ -294,6 +297,7 @@
       editor.setValue(contents);
       fileHandle = handle;
       isDirty = false;
+      localStorage.setItem('svgLabLastFilename', file.name);
       updateFilenameDisplay(file.name);
     } catch (err) { console.error('Open cancelled:', err); }
   }
@@ -310,6 +314,7 @@
     autosaveTimer = setTimeout(() => {
       writeFile(fileHandle, editor.getValue()).then(() => {
         localStorage.setItem('svgLabLastCode', editor.getValue());
+        localStorage.setItem('svgLabLastFilename', fileHandle.name);
         isDirty = false;
         updateFilenameDisplay(fileHandle.name);
       }).catch(console.error);
@@ -322,6 +327,7 @@
       if (fileHandle) {
         await writeFile(fileHandle, editor.getValue());
         localStorage.setItem('svgLabLastCode', editor.getValue());
+        localStorage.setItem('svgLabLastFilename', fileHandle.name);
         isDirty = false;
         updateFilenameDisplay(fileHandle.name);
       } else {
@@ -344,8 +350,8 @@
       editor.setValue(text);
       fileHandle = null;
       isDirty = true;
-      updateFilenameDisplay(file.name + ' (not saved)');
       localStorage.setItem('svgLabLastCode', text);
+      updateFilenameDisplay(file.name + ' (not saved)');
     } else {
       alert('Only SVG files supported for drag-drop');
     }
