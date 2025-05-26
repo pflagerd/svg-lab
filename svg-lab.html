@@ -131,231 +131,207 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
 <script>
-  let fileHandle = null, autosaveTimer = null;
-  let zoomLevel = 1, panX = 0, panY = 0;
-  let transformOriginX = 0, transformOriginY = 0;
-  let isDragging = false, startX, startY;
-  let isDirty = false;
 
-  const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
-    mode: 'xml', theme: 'material', lineNumbers: true, lineWrapping: true
-  });
+let fileHandle = null, autosaveTimer = null;
+let zoomLevel = 1, panX = 0, panY = 0;
+let transformOriginX = 0, transformOriginY = 0;
+let isDragging = false, startX, startY;
+let isDirty = false;
 
-  const zoomWrapper = document.getElementById('zoomWrapper');
-  const svgPreview = document.getElementById('svgPreview');
-  const templateSelect = document.getElementById('templateSelect');
-  const editorPanel = document.getElementById('editorPanel');
-  const filenameDisplay = document.getElementById('filenameDisplay');
-  const resizer = document.getElementById('resizer');
+const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
+  mode: 'xml', theme: 'material', lineNumbers: true, lineWrapping: true
+});
 
-  function updateFilenameDisplay(name) {
-    const base = name || 'Unsaved file';
-    filenameDisplay.textContent = isDirty ? `${base} *` : base;
+const zoomWrapper = document.getElementById('zoomWrapper');
+const svgPreview = document.getElementById('svgPreview');
+const templateSelect = document.getElementById('templateSelect');
+const editorPanel = document.getElementById('editorPanel');
+const filenameDisplay = document.getElementById('filenameDisplay');
+const resizer = document.getElementById('resizer');
+
+function updateFilenameDisplay(name) {
+  const base = name || 'Unsaved file';
+  filenameDisplay.textContent = isDirty ? `${base} *` : base;
+}
+
+const savedCode = localStorage.getItem('svgLabLastCode');
+const savedName = localStorage.getItem('svgLabLastFilename');
+editor.setValue(savedCode || `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Start editing SVG here -->
+</svg>`);
+updateFilenameDisplay(savedName);
+updatePreview();
+
+editor.on('change', () => {
+  isDirty = true;
+  updateFilenameDisplay(localStorage.getItem('svgLabLastFilename'));
+  updatePreview();
+  if (!localStorage.getItem('svgLabLastCode')) {
+    localStorage.setItem('svgLabLastCode', editor.getValue());
   }
+  scheduleAutosave();
+});
 
-  const savedCode = localStorage.getItem('svgLabLastCode');
-  const savedName = localStorage.getItem('svgLabLastFilename');
-  editor.setValue(savedCode || `<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
-  updateFilenameDisplay(savedName);
+function updatePreview() {
+  zoomWrapper.innerHTML = editor.getValue();
+  applyTransform();
+}
 
-  editor.on('change', () => {
-    isDirty = true;
-    updateFilenameDisplay(localStorage.getItem('svgLabLastFilename'));
-    updatePreview();
-    if (!localStorage.getItem('svgLabLastCode')) {
+function applyTransform() {
+  const svg = zoomWrapper.firstElementChild;
+  if (svg) {
+    svg.style.transformOrigin = `${transformOriginX}px ${transformOriginY}px`;
+    svg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+  }
+}
+
+function ensureTransformOrigin() {
+  const rect = svgPreview.getBoundingClientRect();
+  transformOriginX = rect.width / 2;
+  transformOriginY = rect.height / 2;
+}
+
+function zoomIn() { ensureTransformOrigin(); zoomLevel *= 1.1; applyTransform(); }
+function zoomOut() { ensureTransformOrigin(); zoomLevel /= 1.1; applyTransform(); }
+function resetZoom() { zoomLevel = 1; panX = 0; panY = 0; transformOriginX = 0; transformOriginY = 0; applyTransform(); }
+function zoomToFit() {
+  const svg = zoomWrapper.firstElementChild;
+  if (!svg) return;
+  const viewBox = svg.getBoundingClientRect();
+  const container = svgPreview.getBoundingClientRect();
+  const padding = 20;
+  const scaleX = (container.width - padding * 2) / viewBox.width;
+  const scaleY = (container.height - padding * 2) / viewBox.height;
+  zoomLevel = Math.min(scaleX, scaleY);
+  panX = 0; panY = 0;
+  transformOriginX = 0; transformOriginY = 0;
+  applyTransform();
+}
+
+svgPreview.addEventListener('wheel', e => {
+  e.preventDefault();
+  const bounds = svgPreview.getBoundingClientRect();
+  const offsetX = e.clientX - bounds.left;
+  const offsetY = e.clientY - bounds.top;
+  transformOriginX = (offsetX - panX) / zoomLevel;
+  transformOriginY = (offsetY - panY) / zoomLevel;
+  e.deltaY < 0 ? zoomIn() : zoomOut();
+});
+
+svgPreview.addEventListener('mousedown', e => {
+  isDragging = true; startX = e.clientX; startY = e.clientY;
+});
+svgPreview.addEventListener('mousemove', e => {
+  if (isDragging) {
+    panX += e.clientX - startX;
+    panY += e.clientY - startY;
+    startX = e.clientX;
+    startY = e.clientY;
+    applyTransform();
+  }
+});
+svgPreview.addEventListener('mouseup', () => isDragging = false);
+svgPreview.addEventListener('mouseleave', () => isDragging = false);
+
+resizer.addEventListener('mousedown', e => {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = editorPanel.offsetWidth;
+  function resize(e) {
+    editorPanel.style.width = `${startWidth + (e.clientX - startX)}px`;
+  }
+  function stop() {
+    window.removeEventListener('mousemove', resize);
+    window.removeEventListener('mouseup', stop);
+  }
+  window.addEventListener('mousemove', resize);
+  window.addEventListener('mouseup', stop);
+});
+
+async function saveAsFile() {
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: 'drawing.svg',
+      types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
+    });
+    await writeFile(fileHandle, editor.getValue());
+    localStorage.setItem('svgLabLastCode', editor.getValue());
+    localStorage.setItem('svgLabLastFilename', fileHandle.name);
+    isDirty = false;
+    updateFilenameDisplay(fileHandle.name || 'Saved File');
+  } catch (err) { console.error('Save cancelled:', err); }
+}
+
+async function openFile() {
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
+    });
+    const file = await handle.getFile();
+    const contents = await file.text();
+    editor.setValue(contents);
+    fileHandle = handle;
+    isDirty = false;
+    localStorage.setItem('svgLabLastFilename', file.name);
+    updateFilenameDisplay(file.name);
+  } catch (err) { console.error('Open cancelled:', err); }
+}
+
+async function writeFile(handle, contents) {
+  const writable = await handle.createWritable();
+  await writable.write(contents);
+  await writable.close();
+}
+
+function scheduleAutosave() {
+  if (!fileHandle) return;
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    writeFile(fileHandle, editor.getValue()).then(() => {
       localStorage.setItem('svgLabLastCode', editor.getValue());
-    }
-    scheduleAutosave();
-  });
+      localStorage.setItem('svgLabLastFilename', fileHandle.name);
+      isDirty = false;
+      updateFilenameDisplay(fileHandle.name);
+    }).catch(console.error);
+  }, 1000);
+}
 
-  const templates = {
-    circle: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="100" cy="100" r="80" fill="skyblue" stroke="black" stroke-width="2"/>
-</svg>`,
-    rectangle: `<svg width="300" height="150" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="100" x="50" y="25" fill="tomato" stroke="black" stroke-width="3"/>
-</svg>`,
-    star: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-  <polygon points="100,10 120,180 10,60 190,60 80,180" fill="gold" stroke="black" stroke-width="2"/>
-</svg>`,
-    complex: `<svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:rgb(255,255,0);stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:1"/>
-    </linearGradient>
-  </defs>
-  <ellipse cx="200" cy="100" rx="180" ry="80" fill="url(#grad1)" />
-  <text x="200" y="105" font-size="30" text-anchor="middle" fill="black">SVG Lab</text>
-</svg>`
-  };
-
-  templateSelect.addEventListener('change', e => {
-    const val = e.target.value;
-    if (templates[val]) editor.setValue(templates[val]);
-  });
-
-  function updatePreview() {
-    zoomWrapper.innerHTML = editor.getValue();
-    applyTransform();
-  }
-
-  function applyTransform() {
-    const svg = zoomWrapper.firstElementChild;
-    if (svg) {
-      svg.style.transformOrigin = `${transformOriginX}px ${transformOriginY}px`;
-      svg.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
-    }
-  }
-
-  function ensureTransformOrigin() {
-    if (transformOriginX == null || transformOriginY == null) {
-      const rect = svgPreview.getBoundingClientRect();
-      transformOriginX = rect.width / 2;
-      transformOriginY = rect.height / 2;
-    }
-  }
-
-  function zoomIn() { ensureTransformOrigin(); zoomLevel *= 1.1; applyTransform(); }
-  function zoomOut() { ensureTransformOrigin(); zoomLevel /= 1.1; applyTransform(); }
-  function resetZoom() { zoomLevel = 1; panX = 0; panY = 0; transformOriginX = 0; transformOriginY = 0; applyTransform(); }
-  function zoomToFit() {
-    const svg = zoomWrapper.firstElementChild;
-    if (!svg) return;
-    const viewBox = svg.getBoundingClientRect();
-    const container = svgPreview.getBoundingClientRect();
-    const padding = 20;
-    const scaleX = (container.width - padding * 2) / viewBox.width;
-    const scaleY = (container.height - padding * 2) / viewBox.height;
-    zoomLevel = Math.min(scaleX, scaleY);
-    panX = 0; panY = 0;
-    transformOriginX = 0; transformOriginY = 0;
-    applyTransform();
-  }
-
-  svgPreview.addEventListener('wheel', e => {
+window.addEventListener('keydown', async e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
-    const bounds = svgPreview.getBoundingClientRect();
-    const offsetX = e.clientX - bounds.left;
-    const offsetY = e.clientY - bounds.top;
-    transformOriginX = (offsetX - panX) / zoomLevel;
-    transformOriginY = (offsetY - panY) / zoomLevel;
-    e.deltaY < 0 ? zoomIn() : zoomOut();
-  });
-
-  svgPreview.addEventListener('mousedown', e => {
-    isDragging = true; startX = e.clientX; startY = e.clientY;
-  });
-  svgPreview.addEventListener('mousemove', e => {
-    if (isDragging) {
-      panX += e.clientX - startX;
-      panY += e.clientY - startY;
-      startX = e.clientX;
-      startY = e.clientY;
-      applyTransform();
-    }
-  });
-  svgPreview.addEventListener('mouseup', () => isDragging = false);
-  svgPreview.addEventListener('mouseleave', () => isDragging = false);
-
-  resizer.addEventListener('mousedown', e => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = editorPanel.offsetWidth;
-    function resize(e) {
-      editorPanel.style.width = `${startWidth + (e.clientX - startX)}px`;
-    }
-    function stop() {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stop);
-    }
-    window.addEventListener('mousemove', resize);
-    window.addEventListener('mouseup', stop);
-  });
-
-  async function saveAsFile() {
-    try {
-      fileHandle = await window.showSaveFilePicker({
-        suggestedName: 'drawing.svg',
-        types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
-      });
+    if (fileHandle) {
       await writeFile(fileHandle, editor.getValue());
       localStorage.setItem('svgLabLastCode', editor.getValue());
       localStorage.setItem('svgLabLastFilename', fileHandle.name);
       isDirty = false;
-      updateFilenameDisplay(fileHandle.name || 'Saved File');
-    } catch (err) { console.error('Save cancelled:', err); }
-  }
-
-  async function openFile() {
-    try {
-      const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
-      });
-      const file = await handle.getFile();
-      const contents = await file.text();
-      editor.setValue(contents);
-      fileHandle = handle;
-      isDirty = false;
-      localStorage.setItem('svgLabLastFilename', file.name);
-      updateFilenameDisplay(file.name);
-    } catch (err) { console.error('Open cancelled:', err); }
-  }
-
-  async function writeFile(handle, contents) {
-    const writable = await handle.createWritable();
-    await writable.write(contents);
-    await writable.close();
-  }
-
-  function scheduleAutosave() {
-    if (!fileHandle) return;
-    clearTimeout(autosaveTimer);
-    autosaveTimer = setTimeout(() => {
-      writeFile(fileHandle, editor.getValue()).then(() => {
-        localStorage.setItem('svgLabLastCode', editor.getValue());
-        localStorage.setItem('svgLabLastFilename', fileHandle.name);
-        isDirty = false;
-        updateFilenameDisplay(fileHandle.name);
-      }).catch(console.error);
-    }, 1000);
-  }
-
-  window.addEventListener('keydown', async e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      if (fileHandle) {
-        await writeFile(fileHandle, editor.getValue());
-        localStorage.setItem('svgLabLastCode', editor.getValue());
-        localStorage.setItem('svgLabLastFilename', fileHandle.name);
-        isDirty = false;
-        updateFilenameDisplay(fileHandle.name);
-      } else {
-        await saveAsFile();
-      }
-    }
-  });
-
-  editorPanel.addEventListener('dragover', e => {
-    e.preventDefault();
-    editorPanel.classList.add('dragover');
-  });
-  editorPanel.addEventListener('dragleave', () => editorPanel.classList.remove('dragover'));
-  editorPanel.addEventListener('drop', async e => {
-    e.preventDefault();
-    editorPanel.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file?.type === 'image/svg+xml') {
-      const text = await file.text();
-      editor.setValue(text);
-      fileHandle = null;
-      isDirty = true;
-      localStorage.setItem('svgLabLastCode', text);
-      updateFilenameDisplay(file.name + ' (not saved)');
+      updateFilenameDisplay(fileHandle.name);
     } else {
-      alert('Only SVG files supported for drag-drop');
+      await saveAsFile();
     }
-  });
+  }
+});
+
+editorPanel.addEventListener('dragover', e => {
+  e.preventDefault();
+  editorPanel.classList.add('dragover');
+});
+editorPanel.addEventListener('dragleave', () => editorPanel.classList.remove('dragover'));
+editorPanel.addEventListener('drop', async e => {
+  e.preventDefault();
+  editorPanel.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file?.type === 'image/svg+xml') {
+    const text = await file.text();
+    editor.setValue(text);
+    fileHandle = null;
+    isDirty = true;
+    localStorage.setItem('svgLabLastCode', text);
+    updateFilenameDisplay(file.name + ' (not saved)');
+  } else {
+    alert('Only SVG files supported for drag-drop');
+  }
+});
+
 </script>
 </body>
 </html>
