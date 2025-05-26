@@ -23,3 +23,5 @@ I want the zoom centered at the mouse position, instead of being relative to upp
 I'd like a "zoom to fit" button.
 Also, when I use the zoom buttons after using the mousewheel, the image "jumps".  Kind of like the zoom buttons don't respect the last mouse position used to zoom.
 Zoom is still not quite right.  Still not computing correct scaled panned origin?
+As soon as I've made any code modification, I want an asterisk to appear next to the filename at the top of the page to show the user that a save is needed.  When the code is saved, I want the asterisk to disappear.  I want the same behavior whether the code is manually saved or autosaved.
+As soon as the editor contents is saved to a file, I'd like same contents to be put into the browser's local storage, then when the user start the application again, I want the contents retrieved from local storage.

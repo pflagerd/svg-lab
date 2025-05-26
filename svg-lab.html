@@ -135,6 +135,7 @@
   let zoomLevel = 1, panX = 0, panY = 0;
   let transformOriginX = 0, transformOriginY = 0;
   let isDragging = false, startX, startY;
+  let isDirty = false;
 
   const editor = CodeMirror.fromTextArea(document.getElementById('editor'), {
     mode: 'xml', theme: 'material', lineNumbers: true, lineWrapping: true
@@ -146,6 +147,23 @@
   const editorPanel = document.getElementById('editorPanel');
   const filenameDisplay = document.getElementById('filenameDisplay');
   const resizer = document.getElementById('resizer');
+
+  function updateFilenameDisplay(name) {
+    const base = name || 'Unsaved file';
+    filenameDisplay.textContent = isDirty ? `${base} *` : base;
+  }
+
+  editor.on('change', () => {
+    isDirty = true;
+    updateFilenameDisplay(fileHandle?.name);
+    updatePreview();
+    scheduleAutosave();
+  });
+
+  templateSelect.addEventListener('change', e => {
+    const val = e.target.value;
+    if (templates[val]) editor.setValue(templates[val]);
+  });
 
   const templates = {
     circle: `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
@@ -170,16 +188,6 @@
   };
 
   editor.setValue(`<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">\n  <!-- Start editing SVG here -->\n</svg>`);
-
-  editor.on('change', () => {
-    updatePreview();
-    scheduleAutosave();
-  });
-
-  templateSelect.addEventListener('change', e => {
-    const val = e.target.value;
-    if (templates[val]) editor.setValue(templates[val]);
-  });
 
   function updatePreview() {
     zoomWrapper.innerHTML = editor.getValue();
@@ -225,7 +233,6 @@
     applyTransform();
   }
 
-  // ✅ Mouse-based zoom with accurate origin
   svgPreview.addEventListener('wheel', e => {
     e.preventDefault();
     const bounds = svgPreview.getBoundingClientRect();
@@ -266,10 +273,6 @@
     window.addEventListener('mouseup', stop);
   });
 
-  function updateFilenameDisplay(name) {
-    filenameDisplay.textContent = name || 'Unsaved file';
-  }
-
   async function saveAsFile() {
     try {
       fileHandle = await window.showSaveFilePicker({
@@ -277,6 +280,7 @@
         types: [{ description: 'SVG Files', accept: { 'image/svg+xml': ['.svg'] } }]
       });
       await writeFile(fileHandle, editor.getValue());
+      isDirty = false;
       updateFilenameDisplay(fileHandle.name || 'Saved File');
     } catch (err) { console.error('Save cancelled:', err); }
   }
@@ -290,6 +294,7 @@
       const contents = await file.text();
       editor.setValue(contents);
       fileHandle = handle;
+      isDirty = false;
       updateFilenameDisplay(file.name);
     } catch (err) { console.error('Open cancelled:', err); }
   }
@@ -304,14 +309,23 @@
     if (!fileHandle) return;
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
-      writeFile(fileHandle, editor.getValue()).catch(console.error);
+      writeFile(fileHandle, editor.getValue()).then(() => {
+        isDirty = false;
+        updateFilenameDisplay(fileHandle.name);
+      }).catch(console.error);
     }, 1000);
   }
 
   window.addEventListener('keydown', async e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
-      fileHandle ? await writeFile(fileHandle, editor.getValue()) : await saveAsFile();
+      if (fileHandle) {
+        await writeFile(fileHandle, editor.getValue());
+        isDirty = false;
+        updateFilenameDisplay(fileHandle.name);
+      } else {
+        await saveAsFile();
+      }
     }
   });
 
@@ -328,6 +342,7 @@
       const text = await file.text();
       editor.setValue(text);
       fileHandle = null;
+      isDirty = true;
       updateFilenameDisplay(file.name + ' (not saved)');
     } else {
       alert('Only SVG files supported for drag-drop');
